@@ -12,7 +12,7 @@ EIGENINC = $(EIGEN)
 
 LDFLAGS  := -Wl,--no-as-needed $(LDFLAGS) $(ROOTLIB) -L$(LIBDIR)
 #LDLIBS   := -losc3pp
-CXXFLAGS := $(CXXFLAGS) $(DEBUG) -fPIC -std=c++11 -O3 -march=native $(ROOTCXX) -I$(INCDIR) -I$(EIGENINC)
+CXXFLAGS := $(CXXFLAGS) $(DEBUG) -fPIC -std=c++11 -O3 $(ROOTCXX) -I$(INCDIR) -I$(EIGENINC)
 
 
 

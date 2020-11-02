@@ -6,17 +6,17 @@
 
 
 # output name unique to combination of sets
-name="beam_test"
+name="one_two"
 
 # list of files with contours
-model=("errorstudy/one/NH_NH/contours/point_xxx.root"
-       "errorstudy/two/NH_NH/contours/point_yyy.root"
-       "errorstudy/three/NH_NH/contours/point_zzz.root")
+model=("errorstudy/testrun/NH_NH/contours/point_49773.root"
+       "errorstudy/testrun/NH_NH/contours/point_49773.root")
+       #"errorstudy/three/NH_NH/contours/point_zzz.root")
 
 # names for displaying above results
-nickn=("one_xxx"
-       "two_yyy"
-       "three_zzz")
+nickn=("one"
+       "two")
+       #"three_zzz")
 
 
 

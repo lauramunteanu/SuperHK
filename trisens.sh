@@ -32,7 +32,7 @@ fi
 
 
 
-Sens=$PWD/cross-fitter.sh
+Sens=$PWD/bin/fitter
 nameExec=${Sens##*/}
 nameExec=${nameExec%.*}
 
@@ -42,8 +42,8 @@ oscc=$PWD/cards/oscillation.card
 beam=$PWD/cards/beam_sample.card
 atmo=$PWD/cards/atmo_sample.card
 
-MAX_JOBS=500
-MAX_QUEUE=500
+MAX_JOBS=1000
+MAX_QUEUE=1000
 
 root=""
 data=""
@@ -322,6 +322,8 @@ output			= $output/L$nameExec.\$(Process).log
 error			= $output/L$nameExec.\$(Process).log
 stream_output		= True
 stream_error		= True
++JobFlavour="testmatch"
+request_memory=500MB
 
 queue $NJOBS
 
