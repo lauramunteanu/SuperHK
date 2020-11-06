@@ -42,10 +42,11 @@ oscc=$PWD/cards/oscillation.card
 beam=$PWD/cards/beam_sample.card
 atmo=$PWD/cards/atmo_sample.card
 
-MAX_JOBS=1000
+MAX_JOBS=3000
 MAX_QUEUE=1000
 
 root=""
+write_dir=""
 data=""
 #global=/data/tboschi
 MH_1=""
@@ -55,7 +56,7 @@ ff=""		#empty if systematic fit, CPV if fast fit for dCP scan
 mtype="correlation"
 verb="1"
 
-while getopts 'r:d:1:2:N:t:m:sf:v:h' flag; do
+while getopts 'r:d:1:2:N:w:t:m:sf:v:h' flag; do
 	case "${flag}" in
 		1) MH_1="${OPTARG}" ;;
 		2) MH_2="${OPTARG}" ;;
@@ -67,6 +68,7 @@ while getopts 'r:d:1:2:N:t:m:sf:v:h' flag; do
 		s) ss=true ;;
 		f) ff="${OPTARG}" ;;
 		v) verb="${OPTARG}" ;;
+		w) write_dir="${OPTARG}" ;;
 		h) echo "$usage" >&2
 		   exit 0 ;;
 		*) printf "illegal option -%s\n" "$OPTARG" >&2
@@ -106,8 +108,11 @@ fi
 #define mass hierarchy to fit
 mhfit=$MH_1"_"$MH_2
 root=$root/$mhfit
+write_dir=$write_dir/$mhfit
 
+echo $write_dir
 mkdir -p $root/sensitivity/
+mkdir -p $write_dir/sensitivity/
 
 # copy cards to output folder
 cp $card $fitc $oscc $beam $atmo $root/sensitivity/
@@ -289,11 +294,14 @@ fi
 for t in "${point[@]}" ; do
 
 	output=$root/sensitivity/$tname$t
+	output_eos=$write_dir/sensitivity/$tname$t
 	mkdir -p $output
+	mkdir -p $output_eos
 	rm -f $output/*.*
+	rm -f $output_eos/*.*
 	# changing card in upper folder shows which point is currently being fitted
 	sed -i "s:^point.*:point\t$t:" $card
-	sed -i "s:^output.*:output\t\"$output/SpaghettiSens.root\":" $card
+	sed -i "s:^output.*:output\t\"$output_eos/SpaghettiSens.root\":" $card
 
 	scriptname=$output/R$nameExec.$t.sub
 
@@ -322,7 +330,7 @@ output			= $output/L$nameExec.\$(Process).log
 error			= $output/L$nameExec.\$(Process).log
 stream_output		= True
 stream_error		= True
-+JobFlavour="testmatch"
++JobFlavour="workday"
 request_memory=500MB
 
 queue $NJOBS
