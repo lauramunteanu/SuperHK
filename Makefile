@@ -2,6 +2,7 @@ INCDIR =	include
 APPDIR =	app
 BINDIR =	bin
 LIBDIR =	lib
+DOCDIR =	doc
 
 ## root
 ROOTLIB		= $(shell root-config --glibs)
@@ -9,6 +10,9 @@ ROOTCXX		= $(shell root-config --cflags)
 
 ## Eigen matrix library
 EIGENINC = $(EIGEN)
+
+#optimization
+ARCH ?= -march=native
 
 LDFLAGS  := -Wl,--no-as-needed $(LDFLAGS) $(ROOTLIB) -L$(LIBDIR)
 #LDLIBS   := -losc3pp
@@ -37,8 +41,13 @@ all: welcome $(TARGET)
 	@cp $(TARGET) $(BINDIR)
 	@echo "Done!"
 
+doc: 
+	$(MAKE) -C $(DOCDIR)
+
 welcome:
 	@echo "If you need to build just one file, do make APP=name"
+	@echo "or if you need to specify an architecture, do make ARCH=arch"
+	@echo "To build documentation, make doc"
 	@echo "Enjoy your compilation"
 
 
@@ -55,4 +64,4 @@ clean:
 	-find $(BINDIR) -maxdepth 1 -type f -name "*"   -delete
 
 
-.PHONY: all clean
+.PHONY: all doc clean

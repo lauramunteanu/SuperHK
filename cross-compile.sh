@@ -1,12 +1,15 @@
 #! /bin/bash
 
-usage="Usage: $0
+usage="usage: $0
 
-Compile the fitter binary on some nodes on the cluster.
+Compile the fitter and the atmo_input binaries on some nodes on the cluster.
 The script runs through all the nodes and compiles a new version of the binary
-only if a new architecture is found.
+only if a new architecture is found. If it was not possible to ssh into any
+node, then a generic version of the two binaries will be compiled, otherwise
+a highly optimized version is creted.
 
-Works with HTCondor or Slurm and requires shared file system between nodes."
+Works with HTCondor or Slurm and requires shared file system between nodes.
+"
 
 
 if [ "$#" -gt 0 ] ; then
@@ -26,7 +29,7 @@ sleep 10
 EOF
 
 if condor_q &> /dev/null ; then
-	hpc=$(condor_status | awk -v m=$tag '/ph\.qmul\.ac\.uk/ {sub(/.*@/, ""); print $1} ' | sort -u)
+	hpc=$(condor_status | awk '/@/ {sub(/.*@/, "", $1); print $1}' | sort -u)
 elif squeue &> /dev/null ; then
 	hpc=$(sinfo -h -N -p nms_research,shared -o "%n" | sort -u)
 else
@@ -45,11 +48,14 @@ do
 	ssh -o UserKnownHostsFile=/dev/null \
 	    -o LogLevel=ERROR \
 	    -o PasswordAuthentication=no \
-	    -o UserKnownHostsFile=/dev/null \
 	    -o StrictHostKeyChecking=no \
 	    $host /bin/bash << EOF
 echo on \$(hostname)
-source .profile
+if [ -f ~/.bash_profile ] ; then
+	. ~/.bash_profile
+elif [ -f ~/.profile ] ; then
+	. ~/.profile
+fi
 cd $PWD
 arch=\$(gcc -march=native -Q --help=target | grep march | cut -f3)
 tgt=bin/arch/fitter_\$arch
@@ -68,4 +74,15 @@ done
 
 echo on localhost
 make clean
+
+# compile fitter and atmo_input with generic architecture
+# if it wasn't possible to compile on the cluster
+if ls bin/arch/fitter_* &> /dev/null ; then
+	make APP=fitter ARCH=
+fi
+if ls bin/arch/atmo_input_* &> /dev/null ; then
+	make APP=atmo_input ARCH=
+fi
+
+#compile the rest
 make
