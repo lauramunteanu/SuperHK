@@ -31,6 +31,8 @@ Optional parameters
                     and the fitter will change deltaCP true value along the range
     -p <list>       file with list of true points to fit, useful to use in combin-
                     ation with [-x]. If not specified, nominal points are used.
+    -w <dir>        specify a different directory for log files as some file shared
+    		    systems redirect output differently
     -m <matrix>	    specify matrix name for beam sample; the default one is
     		    \"correlation\"
     -v <verb>       specify a verbosity value where <verb> is an integer number;
@@ -62,7 +64,7 @@ MAX_JOBS=3000
 MAX_QUEUE=1000
 
 root=""
-write_dir=""
+logr=""
 data=""
 #global=/data/tboschi
 MH_1=""
@@ -75,11 +77,12 @@ NJOBS=360
 mtype="correlation"
 verb="1"
 
-while getopts 'r:d:1:2:N:w:t:m:sf:xv:h' flag; do
+while getopts 'r:d:1:2:N:t:w:m:sf:p:xv:h' flag; do
 	case "${flag}" in
 		1) MH_1="${OPTARG}" ;;
 		2) MH_2="${OPTARG}" ;;
 		r) root="${OPTARG}" ;;
+		w) logr="${OPTARG}" ;;
 		d) data="${OPTARG}" ;;
 		m) mtype="${OPTARG}" ;;
 		N) NJOBS="${OPTARG}" ;;
@@ -89,7 +92,6 @@ while getopts 'r:d:1:2:N:w:t:m:sf:xv:h' flag; do
 		p) list="${OPTARG}" ;;
 		x) exist=true ;;
 		v) verb="${OPTARG}" ;;
-		w) write_dir="${OPTARG}" ;;
 		h) echo "$usage" >&2
 		   exit 0 ;;
 		*) printf "illegal option -%s\n" "$OPTARG" >&2
@@ -149,11 +151,15 @@ else # must build folders and card files
 	#define mass hierarchy to fit
 	upper=$root
 	mhfit=$MH_1"_"$MH_2
-	root=$root/$mhfit
-	write_dir=$write_dir/$mhfit/
+	upper=$root
+	root=$root/$mhfit/sensitivity
 
+	mkdir -p $root
 
-	mkdir -p $root/sensitivity
+	if [ -n "$logr" ] ; then
+		logr=$logr/$mhfit/sensitivity
+		mkdir -p $logr
+	fi
 
 	# copy cards to output folder
 	cp $card $fitc $oscc $beam $atmo $root
@@ -322,12 +328,10 @@ for t in "${point[@]}" ; do
 	output=$root/sensitivity/$tname$t
 	output_eos=$write_dir/sensitivity/$tname$t
 	mkdir -p $output
-	mkdir -p $output_eos
 	rm -f $output/*.*
-	rm -f $output_eos/*.*
 	# changing card in upper folder shows which point is currently being fitted
 	sed -i "s:^point.*:point\t$t:" $card
-	sed -i "s:^output.*:output\t\"$output_eos/SpaghettiSens.root\":" $card
+	sed -i "s:^output.*:output\t\"$output/SpaghettiSens.root\":" $card
 
 	scriptname=$output/R$nameExec.$t.sub
 
@@ -337,6 +341,14 @@ for t in "${point[@]}" ; do
 	sed -i "s:^oscillation_parameters.*:oscillation_parameters\t\"$oscc\":" $this
 	sed -i "s:^beam_parameters.*:beam_parameters\t\"$beam\":" $this
 	sed -i "s:^atmo_parameters.*:atmo_parameters\t\"$atmo\":" $this
+
+	if [ -n "$logr" ] ; then
+		outlog=$logr/$tname$t
+		mkdir -p $outlog
+		echo Log files are stored in $outlog
+	else
+		outlog=$output
+	fi
 
 	## send as many jobs as files
 	if [ "$SCHED" == "HTCONDOR" ] ; then
@@ -352,8 +364,8 @@ getenv			= True
 should_transfer_files	= IF_NEEDED
 when_to_transfer_output	= ON_EXIT
 initialdir		= $PWD
-output			= $output/L$nameExec.\$(Process).log
-error			= $output/L$nameExec.\$(Process).log
+output			= $outlog/L$nameExec.\$(Process).log
+error			= $outlog/L$nameExec.\$(Process).log
 stream_output		= True
 stream_error		= True
 +JobFlavour="workday"
@@ -371,7 +383,7 @@ EOF
 
 #SBATCH --array=0-$((NJOBS - 1))
 #SBATCH --job-name=$nameExec
-#SBATCH -o $output/L$nameExec.%a.log
+#SBATCH -o $outlog/L$nameExec.%a.log
 #SBATCH -p nms_research,shared
 #SBATCH --time=3-0
 #SBATCH --cpus-per-task=1
