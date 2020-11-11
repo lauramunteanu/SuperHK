@@ -7,21 +7,21 @@
 
 # output name unique to combination of sets
 # this name will be used to refer to each output file
-name="one_two_three"
+name="one_two"
 
 # list of files with CPV exclusion curves
 # these are the output of the exclude.sh script
 # and should be text file with CPV sensitivies
-model=("errorstudy/one/NH_NH/contours/CPV_scan.dat"
-       "errorstudy/two/NH_NH/contours/CPV_scan.dat"
-       "errorstudy/three/NH_NH/contours/CPV_scan.dat")
+model=("/eos/home-l/lamuntea/HK/errorstudy/CPVstudy/NH_NH/contours/CPV_scan.dat"
+       "/eos/home-l/lamuntea/HK/errorstudy/CPVstudy/NH_NH/contours/CPV_scan.dat")
+       #"errorstudy/three/NH_NH/contours/CPV_scan.dat")
 
 # names for displaying above results
 # this will be used by gnuplot to label the curves
 # in the plots and correspond to the input files above
 nickn=("one_cpv"
-       "two_cpv"
-       "three_cpv")
+       "two_cpv")
+       #"three_cpv")
 
 
 

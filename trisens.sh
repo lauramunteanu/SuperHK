@@ -48,7 +48,7 @@ else
 	exit 1
 fi
 
-Sens=$PWD/cross-binary.sh
+Sens=$PWD/bin/fitter
 Oscp=$PWD/bin/oscillation_point
 nameExec=fitter
 
@@ -75,7 +75,7 @@ NJOBS=360
 mtype="correlation"
 verb="1"
 
-while getopts 'r:d:1:2:N:w:t:m:sf:v:h' flag; do
+while getopts 'r:d:1:2:N:w:t:m:sf:xv:h' flag; do
 	case "${flag}" in
 		1) MH_1="${OPTARG}" ;;
 		2) MH_2="${OPTARG}" ;;
@@ -140,11 +140,13 @@ else # must build folders and card files
 
 
 	#define mass hierarchy to fit
-	mhfit=$MH_1"_"$MH_2
 	upper=$root
-	root=$root/$mhfit/sensitivity
+	mhfit=$MH_1"_"$MH_2
+	root=$root/$mhfit
+	write_dir=$write_dir/$mhfit/
 
-	mkdir -p $root
+
+	mkdir -p $root/sensitivity
 
 	# copy cards to output folder
 	cp $card $fitc $oscc $beam $atmo $root
@@ -338,7 +340,7 @@ for t in "${point[@]}" ; do
 #	$sub $scriptname
 
 executable		= $Sens
-arguments		= fitter \$(Process) $NJOBS $this
+arguments		= \$(Process) $NJOBS $this
 getenv			= True
 #requirements		= HasAVXInstructions
 should_transfer_files	= IF_NEEDED
