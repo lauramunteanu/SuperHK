@@ -60,8 +60,8 @@ oscc=$PWD/cards/oscillation.card
 beam=$PWD/cards/beam_sample.card
 atmo=$PWD/cards/atmo_sample.card
 
-MAX_JOBS=3000
-MAX_QUEUE=1000
+MAX_JOBS=4000
+MAX_QUEUE=4000
 
 root=""
 logr=""
@@ -151,8 +151,9 @@ else # must build folders and card files
 	#define mass hierarchy to fit
 	upper=$root
 	mhfit=$MH_1"_"$MH_2
-	upper=$root
 	root=$root/$mhfit/sensitivity
+
+	echo $root
 
 	mkdir -p $root
 
@@ -325,8 +326,7 @@ fi
 #ready to loop over points
 for t in "${point[@]}" ; do
 
-	output=$root/sensitivity/$tname$t
-	output_eos=$write_dir/sensitivity/$tname$t
+	output=$root/$tname$t
 	mkdir -p $output
 	rm -f $output/*.*
 	# changing card in upper folder shows which point is currently being fitted
@@ -368,8 +368,8 @@ output			= $outlog/L$nameExec.\$(Process).log
 error			= $outlog/L$nameExec.\$(Process).log
 stream_output		= True
 stream_error		= True
-+JobFlavour="workday"
-request_memory=500MB
++JobFlavour="testmatch"
+request_memory=2GB
 
 queue $NJOBS
 

@@ -16,10 +16,14 @@ Options
 
 rep=false
 skip=false
-while getopts 'ifh' flag; do
+logr=""
+root=""
+while getopts 'i:r:w:fh' flag; do
 	case "${flag}" in
 		f) rep=true ;;
 		i) skip=true ;;
+		r) root="${OPTARG}" ;;
+		w) logr="${OPTARG}" ;;
 		h) echo "$usage" >&2
 		   exit 0 ;;
 		*) printf "illegal option -%s\n" "$OPTARG" >&2
@@ -27,20 +31,22 @@ while getopts 'ifh' flag; do
 		   exit 1 ;;
 	esac
 done
+pointfile=$root
+echo "logr is "$logr
 
 shift $((OPTIND-1))
 
 if [ "$#" -ne 1 ] ; then
 	echo This script requires one argument. Check usage with
 	echo -e "\n    $0 -h\n"
-	exit 1
+	#exit 1
 elif [ ! -s "$1" ] ; then
 	echo Argument \"$1\" is not valid. Check usage with
 	echo -e "\n    $0 -h\n"
 	exit 1
 fi
 
-Sens=$PWD/cross-binary.sh
+Sens=$PWD/bin/fitter
 nameExec=fitter
 trisens=trisens.sh
 
@@ -66,8 +72,15 @@ else
 	exit 1
 fi
 
-name=${1%.*}
+name=${root%.*}
+name_log=$logr
 root=${name%/*}
+echo "name is "$name
+if [[ "$root" != /* ]] ; then
+	root=$PWD/${root%/}
+else
+	root=${root%/}
+fi
 
 repeat=()
 while read -r point ; do
@@ -78,12 +91,9 @@ while read -r point ; do
 	outdir=$(realpath $outdir)
 	script=$(ls -rt $outdir/R*.$point.sub | tail -n1)
 
-	if [ -n $logr ] ; then
-		outlog=$logr/$(expr "$outdir" : '.*\(.H_.H/.*\)')
-	else
-		outlog=$outdir
-	fi
-
+	outlog=$name_log'_'$point
+	outlog=$(realpath $outlog)
+	
 	# directory does not exists or no script
 	if ! [ -d $outdir ] || ! [ -s $script ] ; then
 		echo Detected: directory $outdir or $script do not exist
@@ -151,7 +161,6 @@ while read -r point ; do
 
 		out=$outdir/SpaghettiSens.$num.root
 		log=$outlog/L$nameExec.$num.log
-
 		bad=false
 		if ! [ -s $out ] ; then	
 			echo Detected: $out does not exist
@@ -207,24 +216,29 @@ while read -r point ; do
 		recover=$outdir/Recover.$rr.sub
 		echo $outdir
 		echo $recover
-		log=$outlog/L$nameExec.$rr.log
+		echo $outlog/L$nameExec.$rr.log
 		if [ "$SCHED" == "HTCONDOR" ] ; then
 			cat > $recover << EOF
 #! /bin/bash
-# script submission for SLURM
+# script submission for condor
 # sumbit with --
 #	$sub $recover
 
 executable		= $Sens
-arguments		= fitter $rr $job $this
+arguments		= $rr $job $this
 getenv			= True
 should_transfer_files	= IF_NEEDED
 when_to_transfer_output	= ON_EXIT
 initialdir		= $PWD
-output			= $log
-error			= $log
+output			= $outlog/L$nameExec.$rr.log
+log 			= $outlog/Logfile$nameExec.$rr.log
+error			= $outlog/L$nameExec.$rr.log
+stream_output		= True
+stream_error		= True
++JobFlavour="testmatch"
 
 queue
+
 EOF
 		elif [ "$SCHED" == "SLURM" ] ; then
 			cat > $recover << EOF
@@ -245,7 +259,7 @@ EOF
 		fi
 		$sub $recover
 	done
-done < $1
+done < $pointfile
 
 if [ "${#repeat[@]}" -gt 0 ] ; then
 	point_file=".points_list"

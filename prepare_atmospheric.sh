@@ -8,6 +8,7 @@ Pre compute the atmospheric sample, using HTCondor or Slurm.
   parameters
     -r root_folder  output folder
     -1 [NH | IH]    mass hierarchy of the observed/true data (NH or IH)
+    -w log_folder   where to store log files. if unspecified they will be stored in the root_folder
 
   optional parameters
     -N num_jobs     number of jobs to submit, default 360
@@ -26,26 +27,28 @@ else
 fi
 
 
-Atmo=$PWD/cross-binary.sh
+Atmo=$PWD/bin/atmo_input
 nameExec=atmo_input
 
 card=$PWD/cards/multi.card
 oscc=$PWD/cards/oscillation.card
 atmo=$PWD/cards/atmo_sample.card
 
-MAX_JOBS=500
-MAX_QUEUE=500
+MAX_JOBS=3000
+MAX_QUEUE=3000
 
 root=""
 data=""
+logr=""
 #global=/data/tboschi
 MH_1=""
 verb="1"
 
-while getopts 'r:1:N:t:v:h' flag; do
+while getopts 'r:1:N:t:w:v:h' flag; do
 	case "${flag}" in
 		1) MH_1="${OPTARG}" ;;
 		r) root="${OPTARG}" ;;
+		w) logr="${OPTARG}" ;;
 		N) NJOBS="${OPTARG}" ;;
 		t) stats="${OPTARG}" ;;
 		v) verb="${OPTARG}" ;;
@@ -84,6 +87,13 @@ fi
 root=$root/$MH_1
 mkdir -p $root
 rm -f $root/*.*
+
+if [ -n "$logr" ] ; then
+		logr=$logr/$MH_1
+		mkdir -p $logr
+else
+	logr=$root
+fi
 
 # copy cards to output folder
 cp $card $oscc $atmo $root/
@@ -146,6 +156,7 @@ sed -i "s:density_profile.*:density_profile\t\"$dens\":"	$atmo
 sed -i "s:honda_production.*:honda_production\t\"$prod\":"	$atmo
 sed -i "s:production_height.*:production_height\t15:"		$atmo
 
+echo "Logr is "$logr
 
 scriptname=$root/R$nameExec.sub
 
@@ -157,14 +168,17 @@ if [ "$SCHED" == "HTCONDOR" ] ; then
 #	$sub $scriptname
 
 executable		= $Atmo
-arguments		= atmo_input \$(Process) $NJOBS $card
+arguments		= \$(Process) $NJOBS $card
 getenv			= True
 #requirements		= HasAVXInstructions
 should_transfer_files	= IF_NEEDED
 when_to_transfer_output	= ON_EXIT
 initialdir		= $PWD
-output			= $root/L$nameExec.\$(Process).log
-error			= $root/L$nameExec.\$(Process).log
+output			= $logr/L$nameExec.\$(Process).log
+error			= $logr/L$nameExec.\$(Process).log
+stream_output		= True
+stream_error		= True
++JobFlavour="workday"
 
 queue $NJOBS
 
