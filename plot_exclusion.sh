@@ -7,21 +7,21 @@
 
 # output name unique to combination of sets
 # this name will be used to refer to each output file
-name="one_two"
+name="cpv_comb_summary"
 
 # list of files with CPV exclusion curves
 # these are the output of the exclude.sh script
 # and should be text file with CPV sensitivies
-model=("/eos/home-l/lamuntea/HK/errorstudy/CPVstudy/NH_NH/contours/CPV_scan.dat"
-       "/eos/home-l/lamuntea/HK/errorstudy/CPVstudy/NH_NH/contours/CPV_scan.dat")
-       #"errorstudy/three/NH_NH/contours/CPV_scan.dat")
+model=("/eos/home-l/lamuntea/HK/errorstudy/CPV_comb/NH_IH/contours/CPV_scan.dat"
+       "/afs/cern.ch/work/l/lamuntea/HK/errorstudy/CPV_comb/NH_NH/contours/CPV_scan.dat"
+       "/eos/home-l/lamuntea/HK/errorstudy/CPV_comb/NH/contours/CPV_scan.dat")
 
 # names for displaying above results
 # this will be used by gnuplot to label the curves
 # in the plots and correspond to the input files above
-nickn=("one_cpv"
-       "two_cpv")
-       #"three_cpv")
+nickn=("nhih" 
+       "nhnh"
+       "unknownMH")
 
 
 
@@ -70,7 +70,7 @@ echo Creating dir plot/$name
 mkdir -p plot/$name
 card=plot/$name/$name.card
 
-rm $lims $olim
+rm $lims $olim $card
 
 for i in ${!model[*]}; do 
 	m="${model[$i]}"
@@ -110,13 +110,13 @@ fi
 
 option="dataset=\"$name\""
 
-plot=( "sens_all.gpl"
-       "sens_diff.gpl" )
+plot=( "sens.gpl"
+       "sens_detail.gpl" )
 
 cd plot
 
 for p in "${plot[@]}" ; do
-	gnuplot -e "$option" $p
+	/afs/cern.ch/user/l/lamuntea/software/gnuplot/bin/gnuplot -e "$option" $p
 done
 
 echo mv -f $name"*.*" $name/
