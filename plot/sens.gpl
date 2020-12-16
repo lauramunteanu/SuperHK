@@ -23,7 +23,7 @@ set mxtics 5
 set xtics -pi, pi/4.0, pi
 
 set format x "%.1P\$\\pi\$"
-set xlabel "\$\\delta_\\text\{CP\}\$"
+set xlabel "\$\\delta_\\text\{CP\}\$" tc lt 1
 
 set yr [0:ymax]
 set ylabel "\$\\sigma (\\delta_\\text\{CP\})\$"

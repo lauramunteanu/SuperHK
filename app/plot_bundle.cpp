@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 
 	// input file should look like this
 	// plot/title/title_type.tex
-	for (int f = 1; f < argc; ++f) {
+	for (int f = 2; f < argc; ++f) {
 		std::string file(argv[f]), title = file;
 		std::cout << "processing file " << file << std::endl;
 
@@ -88,7 +88,7 @@ int main(int argc, char** argv)
 	endDocument(tout);
 	tout.close();
 
-	std::string cmd = "pdflatex " + out + " > /dev/null";
+	std::string cmd = "pdflatex " + out;// + " > /dev/null";
 	system(cmd.c_str());
 
 	return 0;
