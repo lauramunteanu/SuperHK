@@ -47,27 +47,32 @@ class CardDealer
 		template <typename T>
 		CardDealer(T cardFile, bool verb = false) :
 			_cardFile(cardFile),
-			kVerbosity(verb) {
-			Parse(_cardFile);
+			kVerbosity(verb)
+		{
+			size_t lines = Parse(_cardFile);
+			if (kVerbosity)
+				std::cout << "CardDealer: successfully parsed "
+					  << lines << " lines\n";
 		}
 
-		std::string CardName() {
+
+		std::string CardName() const {
 			return _cardFile;
 		}
 
-		bool Parse(const std::string &cardFile) {
+		size_t Parse(const std::string &cardFile) {
 			_entries.clear();
 
 			std::ifstream inf(cardFile.c_str());
 
-			if(!inf.is_open()) {
+			if (!inf.is_open()) {
 				std::string msg = "ERROR CardDealer: " + cardFile + "does not exist";
 				throw std::invalid_argument(msg);
 			}
 			else if (kVerbosity)
 				std::cout << "CardDealer: reading input from " << cardFile << std::endl;
 
-			unsigned int nline = 0;
+			size_t nline = 0;
 			std::string line;
 			while (std::getline(inf, line))
 			{
@@ -123,6 +128,8 @@ class CardDealer
 				if (kVerbosity)
 					std::cout << "CardDealer: obtained key " << key << std::endl;
 			}
+
+			return _entries.size();
 		}
 
 		
@@ -149,7 +156,7 @@ class CardDealer
 		// generic one, uses stringstream to cast string to correct type
 		// good for fundamental type
 		template <typename T, typename std::enable_if<std::is_fundamental<T>::value>::type* = nullptr>
-		bool Get(const std::string &key, T &ret) {
+		bool Get(const std::string &key, T &ret) const {
 			auto id = _entries.find(key);
 			if (id != _entries.end()) {
 				std::stringstream st(id->second.front());
@@ -161,7 +168,7 @@ class CardDealer
 
 		// good for insert types
 		template <typename C, typename std::enable_if<is_sequence<C>::value>::type* = nullptr>
-		bool Get(const std::string &key, C &ret) {
+		bool Get(const std::string &key, C &ret) const {
 			auto id = _entries.find(key);
 			if (id != _entries.end()) {
 				ret.clear();
@@ -180,7 +187,7 @@ class CardDealer
 
 		// return pieces of maps
 		template <typename T>
-		bool Get(const std::string &key, std::map<std::string, T> &ret) {
+		bool Get(const std::string &key, std::map<std::string, T> &ret) const {
 			ret.clear();
 			for (const auto &id : _entries) {
 				if (id.first.find(key) != std::string::npos) {
@@ -196,7 +203,7 @@ class CardDealer
 
 		// for strings, there is no need to cast
 
-		bool Get(const std::string &key, std::string &ret) {
+		bool Get(const std::string &key, std::string &ret) const {
 			auto id = _entries.find(key);
 			if (id != _entries.end()) {
 				ret = id->second.front();
@@ -208,7 +215,7 @@ class CardDealer
 
 		// for vectors of strings, there is no need to cast
 
-		bool Get(const std::string &key, std::vector<std::string> &ret) {
+		bool Get(const std::string &key, std::vector<std::string> &ret) const {
 			auto id = _entries.find(key);
 			if (id != _entries.end()) {
 				ret = id->second;
@@ -218,12 +225,12 @@ class CardDealer
 				return false;
 		}
 
-		bool Get(const std::string &key) {
+		bool Get(const std::string &key) const {
 			return (_entries.find(key) != _entries.end());
 		}
 
 
-		std::vector<std::string> ListKeys() {
+		std::vector<std::string> ListKeys() const {
 			std::vector<std::string> keys;
 			keys.reserve(_entries.size());
 			for (const auto &id : _entries)
@@ -237,8 +244,8 @@ class CardDealer
 		std::map<std::string, int, ic> st;
 		std::map<std::string, std::vector<std::string>, ic> _entries;
 
-		bool kVerbosity;
 		std::string _cardFile;
+		bool kVerbosity;
 };
 
 #endif

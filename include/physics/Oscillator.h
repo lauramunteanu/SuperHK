@@ -8,10 +8,10 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <array>
 #include <map>
 #include <cmath>
 #include <complex>
-#include <tuple>
 #include <algorithm>
 #include <numeric>
 
@@ -40,7 +40,10 @@ class Oscillator
 			angles,
 		};
 
-		typedef std::vector<std::tuple<double, double, double> > Profile;
+		// length, density, yield
+		using LDY = std::array<double, 3>;
+		using Profile = std::vector<LDY>;
+
 		// anyone can access this without object
 		static Oscillator::Profile GetMatterProfile(const std::string &densityFile);
 
@@ -68,9 +71,10 @@ class Oscillator
 		Oscillator(const std::string &densityFile,
 			   bool lut, double threshold);
 		Oscillator(const std::string &cd);
+		Oscillator(const CardDealer &cd);
 		Oscillator(CardDealer *cd);
 
-		void FromCard(CardDealer *cd);
+		void FromCard(const CardDealer &cd);
 
 		double Probability(Nu::Flavour in, Nu::Flavour out,
 				double energy, bool force = false);
@@ -87,7 +91,7 @@ class Oscillator
 				    double ff);
 		Eigen::VectorXd MatterStates(double ff, int off = 0);
 
-		void AutoSet(CardDealer *cd);
+		void AutoSet(const CardDealer &cd);
 
 		template<masses type>
 		void SetMasses(double m1, double m2)
@@ -147,14 +151,12 @@ class Oscillator
 		int _dim;	//number of neutrinos
 		double _thr;
 		bool kLUT;
+		std::map<double, Eigen::MatrixXd > mLUT;
 
 		//Fermi constant in SI units times Avogadro's constant (eV² cm³)/(mol GeV)
-		//double fG2 = Const::GF * pow(Const::hBarC * Const::m/Const::cm, 3) * Const::Na * Const::GeV/Const::eV;
-		//double fG = Const::GF * Const::Na * pow(Const::hBarC, 3) * 1e13;
-		double fG, fG2;
-
-		std::map<double, Eigen::MatrixXd > mLUT;
 		//double fG = 1.52588e-4 / sqrt(8);
+
+
 };
 
 #endif

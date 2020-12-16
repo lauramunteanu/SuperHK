@@ -44,7 +44,7 @@ set output outp
 #plot for [c=2:cols] file u 1:c w l lw 2 lc rgb word(color, (c-1) % words(color)) t word(names, c), \
 #     5 w l dt 3 lc rgb "black" not, 3 w l dt 3 lc rgb "black" not
 
-plot for [c=2:cols] file u 1:c w l lw 2 lc rgb word(color, (c-2) % words(color) +1) t word(names, c), \
+plot for [c=2:cols] file u 1:c w l lw 2 lc rgb word(color, (c-2) % words(color) +1) t system("echo ".word(names, c)." | sed 's:_: :g'"), c), \
      5 w l dt 3 lc rgb "black" not, 3 w l dt 3 lc rgb "black" not
 
 unset output

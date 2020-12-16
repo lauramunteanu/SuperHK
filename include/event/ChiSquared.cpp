@@ -10,47 +10,50 @@
 
 #include "ChiSquared.h"
 
-ChiSquared::ChiSquared(CardDealer *card) :
-	cd(std::unique_ptr<CardDealer>(card)),
+ChiSquared::ChiSquared(const std::string &card) :
 	_nBin(-1),
 	_nSys(-1)
 {
-	Init();
+	CardDealer cd(card);
+	Init(cd);
 }
 
-ChiSquared::ChiSquared(std::string card) :
-	cd(std::unique_ptr<CardDealer>(new CardDealer(card))),
+ChiSquared::ChiSquared(const CardDealer &cd) :
 	_nBin(-1),
 	_nSys(-1)
 {
-	Init();
-}
-
-ChiSquared::~ChiSquared()
-{
-	for (auto &is : _sample)
-		delete is;
+	Init(cd);
 }
 
 
-void ChiSquared::Init()
+ChiSquared::ChiSquared(CardDealer *cd) :
+	_nBin(-1),
+	_nSys(-1)
 {
-	if (!cd->Get("lm_0", lm_0))
+	Init(*cd);
+}
+
+
+void ChiSquared::Init(const CardDealer &cd)
+{
+	if (!cd.Get("lm_0", lm_0))
 		lm_0 = 1;		//default value
-	if (!cd->Get("lm_up", lm_up))
+	if (!cd.Get("lm_up", lm_up))
 		lm_up = 5;		//default value
-	if (!cd->Get("lm_down", lm_down))
+	if (!cd.Get("lm_down", lm_down))
 		lm_down = 10;		//default value
+	if (!cd.Get("lm_min", lm_min))
+		lm_min = 0;		//default value
 
-	if (!cd->Get("max_iterations", maxIteration))
+	if (!cd.Get("max_iterations", maxIteration))
 		maxIteration = 10;
-	if (!cd->Get("max_random_trials", maxTrials))
+	if (!cd.Get("max_random_trials", maxTrials))
 		maxTrials = 1e4;
-	if (!cd->Get("fit_error", fitErr))
+	if (!cd.Get("fit_error", fitErr))
 		fitErr = 1e-9;
 
 
-	if (!cd->Get("verbose", kVerbosity))
+	if (!cd.Get("verbose", kVerbosity))
 		kVerbosity = 0;
 }
 
@@ -108,7 +111,7 @@ int ChiSquared::DOF() {
 // defines nBin too
 void ChiSquared::CombineBinning() {
 	_nBin = std::accumulate(_sample.begin(), _sample.end(), 0,
-		[&](double sum, Sample* is)
+		[](double sum, std::shared_ptr<Sample> is)
 		{ return sum + is->_nBin; });
 }
 
@@ -117,7 +120,7 @@ void ChiSquared::CombineCorrelation()
 {
 	if (_nSys < 0)
 		_nSys = std::accumulate(_sample.begin(), _sample.end(), 0,
-			[&](double sum, Sample* is)
+			[](double sum, std::shared_ptr<Sample> is)
 			{ return sum + is->_nSys; });
 
 	_corr = Eigen::MatrixXd::Identity(_nSys, _nSys);
@@ -134,8 +137,8 @@ void ChiSquared::CombineCorrelation()
 
 void ChiSquared::CombineSystematics()
 {
-	zeroEpsilons = std::accumulate(_sample.begin(), _sample.end(), true,
-			[&](bool res, Sample *is) { return res && is->zeroEpsilons; });
+	zeroEpsilons = std::all_of(_sample.begin(), _sample.end(),
+			[](std::shared_ptr<Sample> is) { return is->zeroEpsilons; } );
 
 	_sysMatrix[0] = Eigen::ArrayXXd::Zero(_nBin, _nSys);
 	for (int sigma = -3; sigma < 4; sigma += 2) {
@@ -156,7 +159,7 @@ void ChiSquared::SetPoint(int p) {
 }
 
 
-std::map<std::string, Eigen::VectorXd> ChiSquared::BuildSamples(Oscillator *osc) {
+std::map<std::string, Eigen::VectorXd> ChiSquared::BuildSamples(std::shared_ptr<Oscillator> osc) {
 	std::map<std::string, Eigen::VectorXd> samples;
 	for (const auto &is : _sample) {
 		std::map<std::string, Eigen::VectorXd> sample = is->BuildSamples(osc);
@@ -166,7 +169,7 @@ std::map<std::string, Eigen::VectorXd> ChiSquared::BuildSamples(Oscillator *osc)
 	return samples;
 }
 
-Eigen::VectorXd ChiSquared::ConstructSamples(Oscillator *osc) {
+Eigen::VectorXd ChiSquared::ConstructSamples(std::shared_ptr<Oscillator> osc) {
 	Eigen::VectorXd vect(_nBin);
 	int off = 0;
 	for (const auto &is : _sample) {
@@ -185,6 +188,13 @@ Eigen::VectorXd ChiSquared::FitX2(const Eigen::VectorXd &On, const Eigen::Vector
 
 	Eigen::VectorXd epsil = Eigen::VectorXd::Zero(_nSys);
 	double x2 = X2(On, En, epsil);
+
+	if (std::isnan(x2)) {
+		std::cerr << "ChiSquared: ERROR - X2 is nan - dumping vectors on stdout\n";
+		std::cout << "ChiSquared: On " << On.transpose() << "\n\n";
+		std::cout << "ChiSquared: En " << En.transpose() << "\n\n";
+		throw std::logic_error("ChiSquared: starting X2 is nan and it shouldn't be\n");
+	}
 
 	if (zeroEpsilons)
 		return epsil;
@@ -238,7 +248,7 @@ Eigen::VectorXd ChiSquared::FitX2(const Eigen::VectorXd &On, const Eigen::Vector
 		}
 
 		// find a better point
-		int rands = 0;
+		size_t rands = 0;
 		do {
 			epsil.setRandom();
 			epsil = best_eps + epsil * step;
@@ -299,7 +309,8 @@ unsigned int ChiSquared::MinimumX2(const Eigen::VectorXd &On,
 	if (kVerbosity > 2)
 		std::cout << "Minimising fit from x2: " << x2 << std::endl;
 
-	while (std::abs(diff / DOF()) > fitErr
+	// default lm_min = 0, cause if lambda == 0 risk of infinite loop
+	while (lambda > lm_min && std::abs(diff / DOF()) > fitErr
 	      && delta.norm() / _nSys > fitErr) {
 	//while (std::abs(diff) > fitErr
 	      //&& delta.norm() > fitErr) {
@@ -324,35 +335,39 @@ unsigned int ChiSquared::MinimumX2(const Eigen::VectorXd &On,
 
 		Eigen::VectorXd nextp = epsil - delta;	//next step
 		//check if this step is good
-		double _x2 = X2(On, En, nextp);
-		if (std::isnan(_x2))
+		double obs_x2 = ObsX2(On, En, nextp);
+		double sys_x2 = SysX2(nextp);
+
+		// requring both terms positive also picks up nan value
+		if (!(obs_x2 >= 0 && sys_x2 >= 0)) // bad points
 			return 2;	//X2 cannot be computed
 
-		diff = x2 - _x2;
+		diff = x2 - (obs_x2 + sys_x2);
 
-		//if (_x2 < x2 || (1-cosb) * _x2 < x2)
 		if (diff > 0) {	//next x2 is better, update lambda and epsilons
 			lambda /= lm_down;
 			epsil = nextp;
-			x2 = _x2;
+			x2 = obs_x2 + sys_x2;
 		}
-		else if (std::abs(delta.norm()) > 0)	//next x2 is worse
+		else if (lambda > 0 && delta.norm() > 0)	//next x2 is worse
 			lambda *= lm_up;	//nothing changes but lambda
 						//if step is nonnull
 
 		//std::cout << "\ndelta\n" << delta << std::endl;
 		//if (false)
 		if (kVerbosity > 2) {
+			//std::cout << "epsil " << delta.transpose() << std::endl;
 			std::cout << c << " -> l " << lambda
 				  << ",\tstep: " << delta.norm() 
-				  << ", X2: " << x2
+				  << ", X2: " << ObsX2(On, En, epsil)
+				  << " + " << SysX2(epsil)
 				  << " ( " << diff
 				  << " ) " << diff / delta.norm() << std::endl;
 		}
 	}
 
-	//if (std::abs(diff / DOF()) < 10*fitErr
-	      //&& delta.norm() / _nSys < 10*fitErr) 	//convergence was reached
+	if (lambda <= lm_min)
+		return 1;	// no convergence
 	return (lambda <= lm_0) ? 0 : 1;
 }
 
@@ -418,7 +433,7 @@ void ChiSquared::JacobianHessian(Eigen::VectorXd &jac, Eigen::MatrixXd &hes,
 
 	// looping over bins of given sample and type <is, it>
 	/* >>>>>>>>>>>>>>> */
-	for (int m = 0, n = is->_offset[it] + bin_off; m < is->_binpos[it].size(); ++m, ++n) {
+	for (size_t m = 0, n = is->_offset[it] + bin_off; m < is->_binpos[it].size(); ++m, ++n) {
 
 		int m0 = slices[m].first, dm = slices[m].second - m0;
 		m0 += bin_off;
@@ -580,8 +595,8 @@ Eigen::ArrayXd ChiSquared::ObsX2n(const Eigen::VectorXd &On,
 			std::vector<Eigen::ArrayXd> scales = is->AllScale(&Sample::Nor, it, skerr);
 
 			//for (int m = 0, n = is->_offset[it]; m < is->_binpos[it].size(); ++m, ++n) {
-			for (int m = 0, n = is->_offset[it] + bin_off;
-					m < is->_binpos[it].size(); ++m, ++n) {
+			for (size_t m = 0, n = is->_offset[it] + bin_off;
+					   m < is->_binpos[it].size(); ++m, ++n) {
 				//if (On(n) == 0)
 				//	continue;
 				int m0 = slices[m].first, dm = slices[m].second - m0;
@@ -614,7 +629,6 @@ Eigen::ArrayXd ChiSquared::RawX2n(const Eigen::VectorXd &On,
 {
 	Eigen::ArrayXd chi2 = Eigen::ArrayXd::Zero(std::min(On.size(), En.size()));
 
-	int err_off = 0, bin_off = 0;
 	for (int n = 0; n < chi2.size(); ++n)
 		if (On(n) > 0)
 			chi2(n) = 2 * En(n) - 2 * On(n) * (1 + log(En(n) / On(n)));
@@ -681,7 +695,7 @@ Eigen::ArrayXd ChiSquared::one_Fk(double err, int k)
 	else if (err >= 0 && err < 1) {
 		dl = 0; du = 1;
 	}
-	else if (err >= 1) {
+	else {
 		dl = 1; du = 3;
 	}
 
@@ -721,7 +735,7 @@ Eigen::ArrayXd ChiSquared::one_Fpk(double err, int k)
 	else if (err >= 0 && err < 1) {
 		dl = 0; du = 1;
 	}
-	else if (err >= 1) {
+	else {
 		dl = 1; du = 3;
 	}
 

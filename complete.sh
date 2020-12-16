@@ -95,7 +95,7 @@ while read -r point ; do
 	outlog=$(realpath $outlog)
 	
 	# directory does not exists or no script
-	if ! [ -d $outdir ] || ! [ -s $script ] ; then
+	if ! [ -d "$outdir" ] || ! [ -s "$script" ] ; then
 		echo Detected: directory $outdir or $script do not exist
 		if [ "$rep" == "true" ] ; then
 			echo Point $point will be resubmitted
@@ -137,7 +137,7 @@ while read -r point ; do
 	for out in "${all[@]}" ; do
 
 		# skip file with weird format
-		if ! [[ $out =~ SpaghettiSens\.[0-9]+\.root ]] ; then
+		if ! [[ "$out" =~ SpaghettiSens\.[0-9]+\.root ]] ; then
 			echo Detected: skip unknown file $out
 			continue
 		fi
@@ -145,7 +145,7 @@ while read -r point ; do
 		num=${out%.root}
 		num=${num##*.}
 
-		if [ $num -ge $job ] ; then
+		if [ "$num" -ge "$job" ] ; then
 			echo Detected: file misplaced $out 
 			if [ "$rep" == "true" ] ; then
 				rm $out
@@ -162,14 +162,16 @@ while read -r point ; do
 		out=$outdir/SpaghettiSens.$num.root
 		log=$outlog/L$nameExec.$num.log
 		bad=false
-		if ! [ -s $out ] ; then	
+		if ! [ -s "$out" ] ; then	
 			echo Detected: $out does not exist
 			bad=true
-		elif [ $out -ot $script ] ; then
+		elif [ "$out" -ot "$script" ] ; then
 			echo Detected: $out is older than $script
 			bad=true  # at this stage output file is newer than script
-		elif [ -s $log ] && ! tail $log | grep -q Finished ; then
-			echo Detected: $log did not finish
+		elif [ -s "$log" ] && ! tail -n1 "$log" | grep -q Finished ; then
+			echo Detected: $log did not finish. Last lines are
+			tail "$log"
+			echo ""
 			bad=true
 		fi
 
@@ -190,14 +192,14 @@ while read -r point ; do
 		echo Repairing $point at $rr/$job
 
 		this=$outdir/this_sensitivity.card
-		if ! [ -s $this ] ; then
+		if ! [ -s "$this" ] ; then
 			# take cards from upper folder
 			card=$outdir/../multi.card
 			fitc=$outdir/../fit_options.card
 			oscc=$outdir/../oscillation.card
 			atmo=$outdir/../beam_sample.card
 			beam=$outdir/../atmo_sample.card
-			if ! [ -s $card ] ; then
+			if ! [ -s "$card" ] ; then
 				echo ERROR There is no main card $(realpath $card), very bad!
 				exit 1
 			fi
@@ -265,7 +267,7 @@ if [ "${#repeat[@]}" -gt 0 ] ; then
 	point_file=".points_list"
 	echo "${repeat[@]}" > $point_file
 	card=$root/multi.card
-	if ! [ -s $card ] ; then
+	if ! [ -s "$card" ] ; then
 		echo ERROR There is no main card $(realpath $card), very bad!
 		exit 1
 	fi

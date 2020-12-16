@@ -73,7 +73,7 @@ set term cairolatex pdf color size 5in, 3.5in lw 2 #standalone header \
 #	"\\usepackage\{amsmath\}"
 set output outp
 
-plot for [c=2:cols] file u 1:c w l lw 2 lc rgb word(color, (c-1) % words(color) +1) t word(names, c), \
+plot for [c=2:cols] file u 1:c w l lw 2 lc rgb word(color, (c-2) % words(color) +1) t system("echo ".word(names, c)." | sed 's:_: :g'"), c), \
      0 w l dt 3 lc rgb "black" not
 
 unset output

@@ -1,6 +1,7 @@
 #! /bin/bash
 
-usage="usage: $0 -r <root> -d <sample> -1 <mh1> -2 <mh2> [-x] [<options>]
+usage="
+usage: $0 -r <root> -d <sample> -1 <mh1> -2 <mh2> [-x] [<options>]
 
 Submit fitter jobs to a scheduler, HTCondor or Slurm.
 The correct binary run is taken from cross-fitter.sh.
@@ -106,10 +107,6 @@ if [ $# -gt 0 ]; then
 	echo "$usage" >&2
 	exit 1
 fi
-
-rm -f .reconstruction_files
-rm -f .production_files
-
 
 
 # add PWD 
@@ -252,8 +249,13 @@ else # must build folders and card files
 		sed -i "s:^systematic_M_RHC.*:systematic_M_RHC \"$sys_M_RHC\":" $beam
 	fi
 
-	reco_beam=$upper'/../reconstruction_beam/syst_*.card'
-	sed -i "s:^reco_input.*:reco_input\t\"$reco_beam\":" $beam
+	reco_beam=$(ls $upper'/../reconstruction_beam/syst_'*.card)
+	reco_beam=(${reco_beam})
+	reco_beam=(${reco_beam[@]/#/\"})	# creates a nice list of files
+	reco_beam=(${reco_beam[@]/%/\",})	# really bad looking , but it works!
+	reco_beam="${reco_beam[@]}"
+	reco_beam=${reco_beam%,}
+	sed -i "s:^reco_input.*:reco_input\t$reco_beam:" $beam
 
 	dens=$PWD'/data/DensityProfileTochibora.dat'
 	sed -i "s:density_profile.*:density_profile\t\"$dens\":"	$beam
@@ -285,9 +287,14 @@ else # must build folders and card files
 	sed -i "s:^pre_tree_name.*:pre_tree_name\t\"atmoTree\":" $atmo
 
 	dens=$PWD'/data/PREM_25pts.dat'
-	prod=$PWD'/data/prod_honda/kam-ally-aa-*.d'
+	prod=$(ls $PWD'/data/prod_honda/kam-ally-aa-'*.d)
+	prod=(${prod})
+	prod=(${prod[@]/#/\"})	# creates a nice list of files
+	prod=(${prod[@]/%/\",})	# really bad looking , but it works!
+	prod="${prod[@]}"
+	prod=${prod%,}
 	sed -i "s:density_profile.*:density_profile\t\"$dens\":"	$atmo
-	sed -i "s:honda_production.*:honda_production\t\"$prod\":"	$atmo
+	sed -i "s:honda_production.*:honda_production\t$prod:"	$atmo
 fi
 
 

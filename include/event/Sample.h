@@ -24,25 +24,42 @@
 class Sample
 {
 	public:
-		Sample(CardDealer *card) :
-			cd(std::unique_ptr<CardDealer>(card)),
+		Sample(const std::string &card) :
 			_nBin(-1),
 			_nSys(-1),
 			_nScale(0)
        		{
-			if (!cd->Get("verbose", kVerbosity))
+			CardDealer cd(card);
+
+			if (!cd.Get("verbose", kVerbosity))
 				kVerbosity = 0;
+			if (!cd.Get("stats", _stats))
+				_stats = 1.0;
 		}
 
-		Sample(std::string card) :
-			cd(std::unique_ptr<CardDealer>(new CardDealer(card))),
+		Sample(const CardDealer &cd) :
+			_nBin(-1),
+			_nSys(-1),
+			_nScale(0)
+       		{
+			if (!cd.Get("verbose", kVerbosity))
+				kVerbosity = 0;
+			if (!cd.Get("stats", _stats))
+				_stats = 1.0;
+		}
+
+		Sample(CardDealer *cd) :
 			_nBin(-1),
 			_nSys(-1),
 			_nScale(0)
        		{
 			if (!cd->Get("verbose", kVerbosity))
 				kVerbosity = 0;
+			if (!cd->Get("stats", _stats))
+				_stats = 1.0;
 		}
+
+		virtual ~Sample() = default;
 
 		/*
 		virtual int NumBin() {
@@ -94,13 +111,13 @@ class Sample
 				//		break;
 				//	}
 
-				std::vector<int> bpos;
+				std::vector<size_t> bpos;
 				bpos.reserve(is.second.size());
 
 				// bpos has nonzero bins
 				for (int i = 0; i < is.second.size(); ++i)
 					if (is.second(i) > 0)
-						bpos.push_back(i);
+						bpos.push_back(size_t(i));
 
 				// lims has start and end of nonzero bins
 				//lims.push_back(_nBin + lims.front());
@@ -146,13 +163,10 @@ class Sample
 
 		// same for every one
 		// BuildSpectrum and then collates everything on a Eigen::Vector
-		virtual Eigen::VectorXd ConstructSamples(Oscillator *osc = 0) {
+		virtual Eigen::VectorXd ConstructSamples(std::shared_ptr<Oscillator> osc = nullptr) {
 
 			std::map<std::string, Eigen::VectorXd> samples = BuildSamples(osc);
 
-			double stats;	//for scaling
-			if (!cd->Get("stats", stats))
-				stats = 1.0;
 
 			Eigen::VectorXd vect(_nBin);
 
@@ -174,15 +188,16 @@ class Sample
 				//}
 			//}
 
-			return vect;
+			return _stats * vect;
 		}
 
 		// must be defined in derived
-		virtual void LoadReconstruction() {};
-		virtual void LoadSystematics() {};
+		virtual void LoadReconstruction(const CardDealer &cd) = 0;
+		virtual void LoadSystematics(const CardDealer &cd) = 0;
 
 		// must be defined in derived
-		virtual std::map<std::string, Eigen::VectorXd> BuildSamples(Oscillator *osc = 0) { std::cout << "virtual build samples\n"; };
+		virtual std::map<std::string, Eigen::VectorXd>
+			BuildSamples(std::shared_ptr<Oscillator> osc = nullptr) = 0;
 
 
 		// energy bin scaling routines
@@ -206,22 +221,22 @@ class Sample
 		}
 		*/
 
-		virtual int StartingBin(std::string it, double shift, int n)
+		virtual size_t StartingBin(std::string it, double shift, int n)
 		{
 			auto im = std::lower_bound(_global[it].begin(),
 					_global[it].end(),
 					_global[it][n] / shift);
-			return int(std::distance(_global[it].begin(), im)) - 1;
+			return std::distance(_global[it].begin(), im) - 1; // negative value?
 			//return std::max(int(std::distance(_global[it].begin(), im)) - 1,
 			//		_limits[it].first);
 		}
 
-		virtual int EndingBin(std::string it, double shift, int n)
+		virtual size_t EndingBin(std::string it, double shift, int n)
 		{
 			auto im = std::upper_bound(_global[it].begin(),
 					_global[it].end(),
 					_global[it][n+1] / shift);
-			return int(std::distance(_global[it].begin(), im));
+			return std::distance(_global[it].begin(), im);
 			//return std::min(int(std::distance(_global[it].begin(), im)),
 			//		_limits[it].second);
 		}
@@ -248,7 +263,7 @@ class Sample
 
 			// loop over bins of this sample
 			//for (int n = _binpos[it].first; n < _binpos[it].second; ++n)
-			for (int n = _offset[it]; n < _offset[it] + _binpos[it].size(); ++n)
+			for (size_t n = _offset[it]; n < _offset[it] + _binpos[it].size(); ++n)
 				allslices.push_back(std::make_pair(n, n+1));
 
 			return allslices;
@@ -260,7 +275,7 @@ class Sample
 		{
 			std::vector<Eigen::ArrayXd> allfacts;
 			//for (int n = _binpos[it].first; n < _binpos[it].second; ++n)
-			for (int n = _offset[it]; n < _offset[it] + _binpos[it].size(); ++n)
+			for (size_t n = _offset[it]; n < _offset[it] + _binpos[it].size(); ++n)
 				allfacts.push_back(Eigen::ArrayXd::Ones(1));
 			return allfacts;
 		}
@@ -291,7 +306,6 @@ class Sample
 
 
 	protected:
-		std::unique_ptr<CardDealer> cd;
 		int kVerbosity;
 		bool zeroEpsilons;
 
@@ -307,11 +321,12 @@ class Sample
 		int _nBin, _allBin;
 		//std::map<std::string, std::pair<int, int> > _binpos;
 		//std::map<std::string, std::pair<int, int> > _limits;
-		std::map<std::string, std::vector<int> > _binpos;
-		std::map<std::string, int> _offset;
+		std::map<std::string, std::vector<size_t> > _binpos;
+		std::map<std::string, size_t> _offset;
 		std::map<std::string, std::vector<double> > _global;
 		// store point for pre computed bins
 		int _point;
+		double _stats;
 
 		// for systematics
 		int _nSys;

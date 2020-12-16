@@ -3,13 +3,13 @@
 Oscillator::Oscillator(const std::vector<double> &lengths,
 		       const std::vector<double> &densities,
 		       bool lut, double threshold) :
-	fG(Const::GF * Const::Na * pow(Const::hBarC * 1e8, 3)),
 	_dim(3),
 	_thr(threshold),
 	kLUT(lut)
 {
-	for (int i = 0; i < lengths.size(); ++i)
-		_lens_dens.push_back(std::make_tuple(lengths[i], densities[i], 0.5));
+	_lens_dens.reserve(lengths.size());
+	for (size_t i = 0; i < lengths.size(); ++i)
+		_lens_dens.push_back({lengths[i], densities[i], 0.5});
 
 	//trans = Eigen::MatrixXcd::Identity(_dim, _dim);
 }
@@ -18,22 +18,19 @@ Oscillator::Oscillator(const std::vector<double> &lengths,
 		       const std::vector<double> &densities,
 		       const std::vector<double> &electrons,
 		       bool lut, double threshold) :
-	fG(Const::GF * Const::Na * pow(Const::hBarC * 1e8, 3)),
 	_dim(3),
 	_thr(threshold),
 	kLUT(lut)
 {
-	for (int i = 0; i < lengths.size(); ++i)
-		_lens_dens.push_back(std::make_tuple(lengths[i],
-						     densities[i],
-						     electrons[i]));
+	_lens_dens.reserve(lengths.size());
+	for (size_t i = 0; i < lengths.size(); ++i)
+		_lens_dens.push_back({lengths[i], densities[i], electrons[i]});
 
 	//trans = Eigen::MatrixXcd::Identity(_dim, _dim);
 }
 
 Oscillator::Oscillator(const std::string &densityFile, 
 		       bool lut, double threshold) :
-	fG(Const::GF * Const::Na * pow(Const::hBarC * 1e8, 3)),
 	_dim(3),
 	_thr(threshold),
 	kLUT(lut)
@@ -42,37 +39,39 @@ Oscillator::Oscillator(const std::string &densityFile,
 }
 
 
-Oscillator::Oscillator(const std::string &card) :
-	fG(Const::GF * Const::Na * pow(Const::hBarC * 1e8, 3))
+Oscillator::Oscillator(const std::string &card)
 {
-	CardDealer *cd = new CardDealer(card);
-	FromCard(cd);
-	delete cd;
-}
-
-Oscillator::Oscillator(CardDealer *cd) :
-	fG(Const::GF * Const::Na * pow(Const::hBarC * 1e8, 3))
-{
+	CardDealer cd(card);
 	FromCard(cd);
 }
 
-void Oscillator::FromCard(CardDealer *cd)
+Oscillator::Oscillator(CardDealer *cd)
+{
+	FromCard(*cd);
+}
+
+Oscillator::Oscillator(const CardDealer &cd)
+{
+	FromCard(cd);
+}
+
+void Oscillator::FromCard(const CardDealer &cd)
 {
 	std::string densityFile;
-	if (cd->Get("density_profile", densityFile))
+	if (cd.Get("density_profile", densityFile))
 		SetMatterProfile(GetMatterProfile(densityFile));
 	else {	//default  vacuum oscillation
 		_lens_dens.clear();
-		_lens_dens.push_back(std::make_tuple(295., 0, 0.5));
+		_lens_dens.push_back({295., 0, 0.5});
 	}
 
-	if (!cd->Get("neutrinos", _dim))
+	if (!cd.Get("neutrinos", _dim))
 		_dim = 3;		// default neutrinos
 
-	if (!cd->Get("threshold", _thr))
+	if (!cd.Get("threshold", _thr))
 		_thr = 1e-9;	// default value
 
-	if (!cd->Get("LUT", kLUT))	//look up table stores matrices
+	if (!cd.Get("LUT", kLUT))	//look up table stores matrices
 		kLUT = false;
 }
 
@@ -87,7 +86,6 @@ Oscillator::Profile Oscillator::GetMatterProfile(const std::string &densityFile)
 
 	std::ifstream inf(densityFile);
 	std::string line;
-	double ll, dd;
 	//std::cout << "Reading " << densityFile << std::endl;
 	while(std::getline(inf, line))
 	{
@@ -98,17 +96,15 @@ Oscillator::Profile Oscillator::GetMatterProfile(const std::string &densityFile)
 			continue;
 
 		std::stringstream ssl(line);
-		std::vector<double> row;
-		double ent;
-		row.reserve(3);	// three columns needed
+		LDY row;
 
-		while (ssl >> ent)
-			row.push_back(ent);
+		size_t i = 0;
+		while (i < 3 && ssl >> row[i++]);
 
 		if (row.size() < 3)
 			row[2] = 0.5;	// electron density default
 
-		lens_dens.push_back(std::make_tuple(row[0], row[1], row[2]));
+		lens_dens.push_back(std::move(row));
 	}
 
 	return lens_dens;
@@ -163,22 +159,21 @@ Eigen::VectorXd Oscillator::Oscillate(Nu::Flavour in, Nu::Flavour out,
 
 double Oscillator::Length(const Oscillator::Profile &lens_dens) {
 	return std::accumulate(lens_dens.begin(), lens_dens.end(), 0.,
-			[&](double sum, std::tuple<double, double, double> ild)
-			{ return sum + std::get<0>(ild); });
+			[](const double &sum, const LDY &ldy)
+			{ return sum + ldy[0]; });
 }
 
 double Oscillator::Density(const Oscillator::Profile &lens_dens) {
 	return std::accumulate(lens_dens.begin(), lens_dens.end(), 0.,
-			[&](double sum, std::tuple<double, double, double> ild)
-			{ return sum + std::get<0>(ild) * std::get<1>(ild); })
+			[](const double &sum, const LDY &ldy)
+			{ return sum + ldy[0] * ldy[1]; })
 		/ Length(lens_dens);
 }
 
 double Oscillator::ElectronDensity(const Oscillator::Profile &lens_dens) {
 	return std::accumulate(lens_dens.begin(), lens_dens.end(), 0.,
-			[&](double sum, std::tuple<double, double, double> ild)
-			{ return sum + std::get<0>(ild) * std::get<1>(ild)
-				     * std::get<2>(ild); })
+			[](const double &sum, const LDY &ldy)
+			{ return sum + ldy[0] * ldy[1] * ldy[2]; })
 		/ Length(lens_dens);
 }
 
@@ -235,13 +230,13 @@ Eigen::MatrixXcd Oscillator::TransitionMatrix(double energy)
 
 	// looping through different layers and densities
 	//for (auto ld = _lens_dens.begin(); ld != _lens_dens.end(); ++ld)
+	const double fG = Const::GF * Const::Na * pow(Const::hBarC * 1e8, 3);
 	for (const auto &ld : _lens_dens)
 	{
-		//ld is a tuple containing <length, density, electron fraction>
+		//ld is an array[3] containing <length, density, electron fraction>
 		// compute some energy factors...
-		double ff  = -sqrt(8) * fG * energy * std::get<1>(ld)
-						    * std::get<2>(ld);
-		double l2e = Const::L2E * std::get<0>(ld) / energy;
+		double ff  = -sqrt(8) * fG * energy * ld[1] * ld[2];
+		double l2e = Const::L2E * ld[0] / energy;
 
 		trans *= TransitionMatrix(ff, l2e);
 	}
@@ -383,24 +378,24 @@ Eigen::VectorXd Oscillator::MatterStates(double ff, int off)	//density factor
 	return vMat;
 }
 
-void Oscillator::AutoSet(CardDealer *cd) {
+void Oscillator::AutoSet(const CardDealer &cd) {
 
 	double M12, M23, S12, S13, S23, dCP;
-	if (!cd->Get("M12", M12))
+	if (!cd.Get("M12", M12))
 		M12 = 7.6e-5;
-	if (!cd->Get("M23", M23))
+	if (!cd.Get("M23", M23))
 		M23 = 2.4e-3;
-	if (!cd->Get("S12", S12))
+	if (!cd.Get("S12", S12))
 		S12 = 0.32;
-	if (!cd->Get("S13", S13))
+	if (!cd.Get("S13", S13))
 		S13 = 0.0256584;
-	if (!cd->Get("S23", S23))
+	if (!cd.Get("S23", S23))
 		S23 = 0.5;
-	if (!cd->Get("dCP", dCP))
+	if (!cd.Get("dCP", dCP))
 		dCP = 0;
 
 	std::string mh;
-	if (!cd->Get("mass_hierarchy", mh))
+	if (!cd.Get("mass_hierarchy", mh))
 		mh = "normal";
 
 	if (mh == "normal")
